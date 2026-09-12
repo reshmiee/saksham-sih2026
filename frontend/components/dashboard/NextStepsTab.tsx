@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { List, FileText, Save, Info, Check } from 'lucide-react';
 import type { DetailedReport } from '@/data/reportsData';
+import { StressTestPanel } from '@/components/dashboard/StressTestPanel';
 import { cn } from '@/lib/cn';
 
 interface NextStepsTabProps {
@@ -51,6 +52,10 @@ export function NextStepsTab({ report }: NextStepsTabProps): React.JSX.Element {
     setSavedStatus('Saved to device');
     setTimeout(() => setSavedStatus(null), 2500);
   }
+
+  const assessment = {
+    id: Number.parseInt(report.id.replace(/^[^\d]*/, ''), 10) || 1,
+  };
 
   return (
     <div className="space-y-6">
@@ -154,6 +159,9 @@ export function NextStepsTab({ report }: NextStepsTabProps): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Business Stress Test */}
+      <StressTestPanel assessmentId={assessment.id} />
 
       {/* Bottom Full-Width Card: Documents You'll Need */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs space-y-4">
