@@ -7,11 +7,18 @@ resilience classifications, edge cases, and API endpoint routing.
 """
 
 import pytest
+from fastapi.testclient import TestClient
+
 from backend.app.engines.stress_engine import (
     StressInputs,
     run_stress_test,
     find_demand_breaking_point,
 )
+from backend.app.main import app
+from backend.app.db.session import SessionLocal
+from backend.app.db.queries import save_assessment
+
+client = TestClient(app)
 
 BASELINE = {
     "estimated_monthly_revenue": 60000.0,
@@ -120,3 +127,93 @@ def test_primary_vulnerability_identification():
     res = run_stress_test(BASELINE, inputs)
     assert res["primary_vulnerability"] == "price"
     assert res["impact_breakdown"]["price"] > res["impact_breakdown"]["demand"]
+
+
+def test_stress_test_api_not_found():
+    """Test API returns 404 for a non-existent assessment ID."""
+    resp = client.post(
+        "/api/v1/assess/99999999/stress-test",
+        json={
+            "demand_shock_pct": 20.0,
+            "price_shock_pct": 10.0,
+            "cost_shock_pct": 15.0,
+            "additional_competitors": 1,
+        },
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Assessment not found."
+
+
+def test_stress_test_api_validation_error():
+    """Test API returns 422 for out-of-bounds shock parameters."""
+    resp = client.post(
+        "/api/v1/assess/1/stress-test",
+        json={
+            "demand_shock_pct": 95.0,  # Max allowed is 90
+            "price_shock_pct": 0.0,
+            "cost_shock_pct": 0.0,
+            "additional_competitors": 0,
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_stress_test_api_success():
+    """Test API successfully simulates stress test on a persisted assessment."""
+    db = SessionLocal()
+    try:
+        saved = save_assessment(
+            db=db,
+            user_id=1,
+            village_id=123579,
+            category_id=1,
+            capital_input=6000.0,
+            fit_score=78.0,
+            confidence_level="High",
+            project_cost=60000.0,
+            max_loan_amount=54000.0,
+            recommended_project_size=60000.0,
+            scheme_id=1,
+            status="Exploring",
+            rating="Viable",
+            competitor_count=3,
+            business_idea="Stress test API verification",
+            interest_rate=6.5,
+            tenure_months=36,
+            moratorium_months=3,
+            monthly_emi=6000.0,
+            total_repayment=216000.0,
+            total_interest=16000.0,
+            estimated_monthly_revenue=60000.0,
+            estimated_monthly_profit=25000.0,
+            repayment_burden_ratio=0.24,
+            repayment_burden_category="Sustainable",
+            feasibility_breakdown={"fit_score": 78.0},
+            ai_insights={"recommendation": "Viable"},
+        )
+        saved_id = saved.id
+    finally:
+        db.close()
+
+    resp = client.post(
+        f"/api/v1/assess/{saved_id}/stress-test",
+        json={
+            "demand_shock_pct": 20.0,
+            "price_shock_pct": 10.0,
+            "cost_shock_pct": 15.0,
+            "additional_competitors": 0,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["assessment_id"] == saved_id
+    assert data["baseline"]["revenue"] == 60000.0
+    assert data["baseline"]["profit"] == 25000.0
+    assert data["baseline"]["emi"] == 6000.0
+    assert data["baseline"]["cash_after_emi"] == 19000.0
+    assert data["stressed"]["revenue"] == 43200.0
+    assert data["stressed"]["cash_after_emi"] == -3050.0
+    assert data["resilience"] == "VULNERABLE"
+    assert data["breaking_point_demand_pct"] == 32.0
+    assert "disclaimer" in data["assumptions"]
+

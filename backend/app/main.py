@@ -21,7 +21,7 @@ logger = logging.getLogger("saksham.main")
 
 from backend.app.db.session import engine, get_db
 from backend.app.db import models
-from backend.app.routers import location, schemes, insights, assess, auth, ai
+from backend.app.routers import location, schemes, insights, assess, auth, ai, stress_test
 
 
 def run_database_migrations(target_engine):
@@ -182,6 +182,7 @@ app.include_router(assess.legacy_router)
 app.include_router(auth.router)
 app.include_router(auth.legacy_router)
 app.include_router(ai.router)
+app.include_router(stress_test.router)
 
 
 @app.get("/health", tags=["System"])
