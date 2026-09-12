@@ -285,3 +285,29 @@ export interface UserProfileInput {
   default_capital?: number | null;
   preferred_language?: string | null;
 }
+
+export interface StressTestRequest {
+  demand_shock_pct: number;
+  price_shock_pct: number;
+  cost_shock_pct: number;
+  additional_competitors: number;
+}
+
+export interface StressMetrics {
+  revenue: number;
+  expenses: number;
+  profit: number;
+  emi: number;
+  cash_after_emi: number;
+}
+
+export interface StressTestResponse {
+  assessment_id: number;
+  baseline: StressMetrics;
+  stressed: StressMetrics;
+  resilience: 'RESILIENT' | 'SENSITIVE' | 'VULNERABLE';
+  impact_breakdown: Record<string, number>;
+  primary_vulnerability: string | null;
+  breaking_point_demand_pct: number | null;
+  assumptions: Record<string, unknown>;
+}

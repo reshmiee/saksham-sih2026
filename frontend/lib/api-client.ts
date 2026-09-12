@@ -93,7 +93,7 @@ import type {
   InsightsResponse, AssessmentResponse, VillageLocation,
   AIQueryRequest, AIQueryResponse, OfficialScheme,
   EMICalculationRequest, EMICalculationResponse, SchemeMatchRequest, SchemeMatchResponse,
-  UserProfile, UserProfileInput,
+  UserProfile, UserProfileInput, StressTestRequest, StressTestResponse, StressMetrics,
 } from './api-types';
 
 // â”€â”€â”€ Base URL Resolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -373,6 +373,27 @@ export function getCachedAssessment(id: string | number): BackendAssessmentRespo
     }
   }
   return null;
+}
+
+// ─── Business Stress Test ──────────────────────────────────────────────────
+
+/**
+ * Runs a deterministic what-if scenario stress test on an existing assessment.
+ * Evaluates business resilience under demand, price, cost, and competitor shocks.
+ */
+export async function runStressTest(
+  assessmentId: number | string,
+  payload: StressTestRequest
+): Promise<StressTestResponse> {
+  const baseUrl = getBackendBaseUrl();
+  return fetchJson<StressTestResponse>(
+    `${baseUrl}/api/v1/assess/${encodeURIComponent(String(assessmentId))}/stress-test`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 // ─── Core API Methods ─────────────────────────────────────────────────────────
