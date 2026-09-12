@@ -50,7 +50,7 @@ export function SchemeEmiCalculator({
   const [selectedSchemeId, setSelectedSchemeId] = useState<number>(
     defaultSchemeId ?? availableSchemes[0]?.id ?? 1
   );
-  const [loanAmount, setLoanAmount] = useState<number>(initialLoanAmount);
+  const [loanAmount, setLoanAmount] = useState<number | string>(initialLoanAmount);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EMICalculationResponse | null>(null);
@@ -58,43 +58,34 @@ export function SchemeEmiCalculator({
   const activeScheme =
     availableSchemes.find((s) => s.id === selectedSchemeId) ?? availableSchemes[0];
 
-  const handleCalculate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeScheme) {
+  const executeCalculation = async (
+    amountToCalculate: number,
+    schemeToUse: OfficialScheme = activeScheme
+  ) => {
+    if (!schemeToUse) {
       setError('Please select a valid scheme');
       return;
     }
-    if (loanAmount <= 0) {
-      setError('Loan amount must be greater than zero');
-      return;
-    }
-    if (loanAmount > activeScheme.max_loan_amount) {
-      setError(
-        `Requested loan (₹${loanAmount.toLocaleString('en-IN')}) exceeds statutory ceiling of ₹${activeScheme.max_loan_amount.toLocaleString('en-IN')} for ${activeScheme.name}.`
-      );
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
       const emiData = await calculateSchemeEmi({
-        loan_amount: loanAmount,
-        interest_rate: activeScheme.interest_rate,
-        tenure_months: activeScheme.tenure_months,
-        moratorium_months: activeScheme.moratorium_months,
+        loan_amount: amountToCalculate,
+        interest_rate: schemeToUse.interest_rate,
+        tenure_months: schemeToUse.tenure_months,
+        moratorium_months: schemeToUse.moratorium_months,
       });
       setResult(emiData);
     } catch {
       // Fallback reducing balance calculation if backend offline
-      const r = activeScheme.interest_rate / (12 * 100);
-      const n = activeScheme.tenure_months - activeScheme.moratorium_months;
-      const emi = (loanAmount * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+      const r = schemeToUse.interest_rate / (12 * 100);
+      const n = Math.max(1, schemeToUse.tenure_months - schemeToUse.moratorium_months);
+      const emi = (amountToCalculate * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
       const totalRepayment = emi * n;
-      const totalInterest = totalRepayment - loanAmount;
+      const totalInterest = totalRepayment - amountToCalculate;
 
       setResult({
-        principal: loanAmount,
+        principal: amountToCalculate,
         monthly_emi: Math.round(emi * 100) / 100,
         total_repayment: Math.round(totalRepayment * 100) / 100,
         total_interest: Math.round(totalInterest * 100) / 100,
@@ -103,6 +94,30 @@ export function SchemeEmiCalculator({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCalculate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeScheme) {
+      setError('Please select a valid scheme');
+      return;
+    }
+    const parsedLoan =
+      typeof loanAmount === 'number'
+        ? loanAmount
+        : parseFloat(String(loanAmount).replace(/,/g, ''));
+    if (isNaN(parsedLoan) || parsedLoan <= 0) {
+      setError('Loan amount must be greater than zero');
+      return;
+    }
+    if (parsedLoan > activeScheme.max_loan_amount) {
+      setError(
+        `Requested loan (₹${parsedLoan.toLocaleString('en-IN')}) exceeds statutory ceiling of ₹${activeScheme.max_loan_amount.toLocaleString('en-IN')} for ${activeScheme.name}.`
+      );
+      return;
+    }
+
+    await executeCalculation(parsedLoan, activeScheme);
   };
 
   return (
@@ -121,7 +136,7 @@ export function SchemeEmiCalculator({
       </div>
 
       {/* Form Inputs matching mockup */}
-      <form onSubmit={handleCalculate} className="space-y-3.5">
+      <form onSubmit={handleCalculate} noValidate className="space-y-3.5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           {/* Scheme Select */}
           <div>
@@ -160,11 +175,11 @@ export function SchemeEmiCalculator({
             <input
               id="loan-amount"
               type="number"
-              min={1000}
-              step={5000}
+              min={1}
+              step="any"
               value={loanAmount}
               onChange={(e) => {
-                setLoanAmount(Number(e.target.value));
+                setLoanAmount(e.target.value);
                 setResult(null);
                 setError(null);
               }}
@@ -201,10 +216,65 @@ export function SchemeEmiCalculator({
       {error && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 border border-rose-200 text-xs text-rose-900 font-medium"
+          className="rounded-xl bg-rose-50 p-3 border border-rose-200 text-xs text-rose-900 font-medium space-y-2"
         >
-          <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
-          <span>{error}</span>
+          <div className="flex items-start gap-2">
+            <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+
+          {/* Assistive actions to calculate anyway or switch scheme */}
+          {(() => {
+            const parsed =
+              typeof loanAmount === 'number'
+                ? loanAmount
+                : parseFloat(String(loanAmount).replace(/,/g, ''));
+            if (isNaN(parsed) || parsed <= 0) return null;
+
+            const alternativeScheme = availableSchemes.find(
+              (s) => s.id !== activeScheme?.id && parsed <= s.max_loan_amount
+            );
+
+            if (alternativeScheme) {
+              return (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSchemeId(alternativeScheme.id);
+                      setError(null);
+                      executeCalculation(parsed, alternativeScheme);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-950 hover:bg-rose-100/70 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <span>
+                      Switch to {alternativeScheme.name} (up to ₹
+                      {alternativeScheme.max_loan_amount.toLocaleString('en-IN')}) & Calculate
+                    </span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    executeCalculation(parsed, activeScheme);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-950 hover:bg-rose-100/70 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <span>
+                    Calculate Indicative EMI (Commercial terms at {activeScheme?.interest_rate}% p.a.)
+                  </span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            );
+          })()}
         </div>
       )}
 

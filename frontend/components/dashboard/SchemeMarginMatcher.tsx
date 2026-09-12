@@ -19,14 +19,15 @@ export function SchemeMarginMatcher({
   initialMargin = 20000,
   category = 'Retail',
 }: SchemeMarginMatcherProps): React.JSX.Element {
-  const [margin, setMargin] = useState<number>(initialMargin);
+  const [margin, setMargin] = useState<number | string>(initialMargin);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [matchResult, setMatchResult] = useState<SchemeMatchResponse | null>(null);
 
   const handleMatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (margin <= 0) {
+    const marginNum = typeof margin === 'number' ? margin : parseFloat(String(margin).replace(/,/g, ''));
+    if (isNaN(marginNum) || marginNum <= 0) {
       setError('Available margin must be greater than zero');
       return;
     }
@@ -35,14 +36,14 @@ export function SchemeMarginMatcher({
     setError(null);
     try {
       const res = await matchScheme({
-        available_margin: margin,
+        available_margin: marginNum,
         category,
       });
       setMatchResult(res);
     } catch {
       // Fallback matching if backend is offline
-      const isMicro = margin <= 30000;
-      const projectCost = margin * 10;
+      const isMicro = marginNum <= 30000;
+      const projectCost = marginNum * 10;
       const maxLoan = projectCost * 0.9;
       const rate = isMicro ? 6.5 : 8.0;
       const tenure = isMicro ? 36 : 84;
@@ -52,7 +53,7 @@ export function SchemeMarginMatcher({
       const emi = (maxLoan * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
 
       setMatchResult({
-        available_margin: margin,
+        available_margin: marginNum,
         project_cost: projectCost,
         max_loan_amount: maxLoan,
         recommended_project_size: projectCost,
@@ -92,7 +93,7 @@ export function SchemeMarginMatcher({
       </div>
 
       {/* Form Inputs matching mockup */}
-      <form onSubmit={handleMatch} className="space-y-3.5">
+      <form onSubmit={handleMatch} noValidate className="space-y-3.5">
         <div>
           <label htmlFor="margin-input" className="block text-xs font-bold text-slate-900 mb-1.5">
             Test Available Margin (₹)
@@ -101,11 +102,11 @@ export function SchemeMarginMatcher({
             <input
               id="margin-input"
               type="number"
-              min={1000}
-              step={5000}
+              min={1}
+              step="any"
               value={margin}
               onChange={(e) => {
-                setMargin(Number(e.target.value));
+                setMargin(e.target.value);
                 setMatchResult(null);
                 setError(null);
               }}

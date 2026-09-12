@@ -389,4 +389,51 @@ describe('Schemes UI Components (SchemesTab & Calculators)', () => {
       expect(screen.getByText('₹2,816.03')).toBeInTheDocument();
     });
   });
+
+  it('SchemeMarginMatcher handles arbitrary large numbers like 200000000 without HTML5 step blocking', async () => {
+    render(<SchemeMarginMatcher category="Retail" initialMargin={20000} />);
+
+    const marginInput = screen.getByLabelText(/Test Available Margin/i);
+    expect(marginInput).toHaveAttribute('step', 'any');
+    expect(marginInput.closest('form')).toHaveAttribute('novalidate');
+
+    // Enter 200000000 (20 Crores) as in user screenshot
+    fireEvent.change(marginInput, { target: { value: '200000000' } });
+
+    // Mock response or let fallback calculate
+    const form = marginInput.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Matched Scheme: Term Loan Scheme/i)).toBeInTheDocument();
+      expect(screen.getByText(/₹2,00,00,00,000/)).toBeInTheDocument();
+    });
+  });
+
+  it('SchemeEmiCalculator allows switching scheme or calculating indicative EMI for large amounts', async () => {
+    render(<SchemeEmiCalculator schemes={MOCK_SCHEMES} defaultSchemeId={1} initialLoanAmount={50000} />);
+
+    const loanInput = screen.getByLabelText(/Proposed Loan Amount/i);
+    expect(loanInput).toHaveAttribute('step', 'any');
+    expect(loanInput.closest('form')).toHaveAttribute('novalidate');
+
+    // Test loan above Micro Finance (1.25L) but within Term Loan (45L)
+    fireEvent.change(loanInput, { target: { value: '250000' } });
+    const form = loanInput.closest('form')!;
+    fireEvent.submit(form);
+
+    // Should show alert with switch button
+    expect(screen.getByRole('alert')).toHaveTextContent(/exceeds statutory ceiling of ₹1,25,000/i);
+    const switchBtn = screen.getByRole('button', { name: /Switch to Term Loan Scheme/i });
+    expect(switchBtn).toBeInTheDocument();
+
+    // Clicking switch button should auto-calculate under Term Loan Scheme
+    fireEvent.click(switchBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Repayment Schedule/i)).toBeInTheDocument();
+      expect(screen.getByText(/4,120/i)).toBeInTheDocument();
+    });
+  });
 });
+
