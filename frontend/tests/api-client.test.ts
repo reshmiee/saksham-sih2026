@@ -10,6 +10,7 @@ import {
   searchLocations,
   formatVillageLocation,
   queryAI,
+  runStressTest,
   type BackendAssessmentResponse,
 } from '@/lib/api-client';
 
@@ -437,6 +438,98 @@ describe('api-client — Unit Tests', () => {
       await expect(
         queryAI({ query: 'What business should I start?' })
       ).rejects.toThrow('AI advisory service is currently unavailable');
+    });
+  });
+
+  describe('runStressTest', () => {
+    it('sends POST request with stress test parameters and receives structured response', async () => {
+      const mockResponse = {
+        assessment_id: 42,
+        baseline: {
+          revenue: 60000,
+          expenses: 35000,
+          profit: 25000,
+          emi: 6000,
+          cash_after_emi: 19000,
+        },
+        stressed: {
+          revenue: 43200,
+          expenses: 40250,
+          profit: 2950,
+          emi: 6000,
+          cash_after_emi: -3050,
+        },
+        resilience: 'VULNERABLE',
+        impact_breakdown: {
+          demand: 9600,
+          price: 5400,
+          cost: 5250,
+          competition: 0,
+        },
+        primary_vulnerability: 'demand',
+        breaking_point_demand_pct: 32.0,
+        assumptions: {
+          demand_shock_pct: 20,
+          price_shock_pct: 10,
+          cost_shock_pct: 15,
+          additional_competitors: 0,
+          disclaimer: 'Scenario analysis based on user-selected hypothetical shocks, not a forecast or prediction.',
+        },
+      };
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockResponse,
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const res = await runStressTest(42, {
+        demand_shock_pct: 20,
+        price_shock_pct: 10,
+        cost_shock_pct: 15,
+        additional_competitors: 0,
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/assess/42/stress-test',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify({
+            demand_shock_pct: 20,
+            price_shock_pct: 10,
+            cost_shock_pct: 15,
+            additional_competitors: 0,
+          }),
+        })
+      );
+      expect(res.assessment_id).toBe(42);
+      expect(res.resilience).toBe('VULNERABLE');
+      expect(res.stressed.revenue).toBe(43200);
+      expect(res.stressed.cash_after_emi).toBe(-3050);
+      expect(res.breaking_point_demand_pct).toBe(32.0);
+    });
+
+    it('throws error when stress test endpoint returns 404', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+          json: async () => ({ detail: 'Assessment not found.' }),
+        })
+      );
+
+      await expect(
+        runStressTest(999, {
+          demand_shock_pct: 0,
+          price_shock_pct: 0,
+          cost_shock_pct: 0,
+          additional_competitors: 0,
+        })
+      ).rejects.toThrow('Assessment not found.');
     });
   });
 });
