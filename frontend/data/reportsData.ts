@@ -83,6 +83,12 @@ export interface DetailedReport {
     readonly localSummary: {
       readonly estimatedHouseholds: number;
       readonly mappedCompetitors: number;
+      readonly estimatedCompetitors?: number;
+      readonly competitorRange?: string;
+      readonly competitorConfidence?: string;
+      readonly competitorRadiusKm?: number;
+      readonly competitorStatus?: 'estimated' | 'verified' | 'unavailable';
+      readonly competitorMethodology?: string;
       readonly nearbyMarkets: number;
       readonly marketOpportunity: string;
     };

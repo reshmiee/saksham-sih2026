@@ -322,6 +322,20 @@ export function generateOfflineAssessment(payload: AssessmentRequest): BackendAs
       retrieval_status: 'complete',
       evidence_available: true,
     },
+    competitor_count: 5,
+    competitors: {
+      mapped: 0,
+      estimated: 5,
+      estimated_min: 3,
+      estimated_max: 7,
+      status: 'estimated',
+      radius_km: 3.5,
+      category: catName,
+      confidence: 'Medium',
+      density_benchmark: '1 enterprise per 120–180 households (NSSO 73rd Round)',
+      methodology: `No mapped OpenStreetMap entries found in local catchment. Estimated total competitors: ~5 (range 3–7) calculated from 680 households using NSSO 73rd Round enterprise density benchmarks.`,
+      data_sources: ['Census 2011 Village Demographics'],
+    },
   };
 }
 

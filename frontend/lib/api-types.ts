@@ -98,6 +98,21 @@ export interface FeasibilityBreakdown {
   infrastructure: number;
 }
 
+export interface CompetitorEstimation {
+  mapped: number;
+  estimated: number;
+  estimated_min: number;
+  estimated_max: number;
+  status: 'estimated' | 'verified' | 'unavailable';
+  radius_km: number;
+  category: string;
+  confidence: 'Low' | 'Medium' | 'High';
+  density_benchmark: string;
+  methodology: string;
+  data_sources: string[];
+  mapped_samples?: Array<{ name: string; source: string; category?: string }>;
+}
+
 export interface RiskItem {
   category: string;
   risk: string;
@@ -181,6 +196,7 @@ export interface BackendAssessmentResponse {
   scheme?: SchemeData;
   ai_insights?: AIInsights;
   competitor_count?: number;
+  competitors?: CompetitorEstimation;
   status?: string;
   created_at?: string;
   project_cost?: number;

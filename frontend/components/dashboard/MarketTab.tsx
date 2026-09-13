@@ -301,10 +301,38 @@ export function MarketTab({ report }: MarketTabProps): React.JSX.Element {
     localSummary?.estimatedHouseholds != null
       ? localSummary.estimatedHouseholds.toLocaleString('en-IN')
       : '2,480';
-  const competitorsVal =
-    localSummary?.mappedCompetitors != null
-      ? String(localSummary.mappedCompetitors)
-      : '8';
+
+  const mappedComp = localSummary?.mappedCompetitors ?? 0;
+  const estimatedComp = localSummary?.estimatedCompetitors;
+  const compRange = localSummary?.competitorRange;
+  const compStatus = localSummary?.competitorStatus;
+
+  let competitorsVal: string;
+  let competitorsSubtext: string;
+  let competitorsTitle: string;
+
+  if (compStatus === 'unavailable') {
+    competitorsVal = 'N/A';
+    competitorsSubtext = 'Data Unavailable';
+    competitorsTitle = 'Competitor data unavailable for this settlement';
+  } else if (compStatus === 'verified' || (mappedComp > 0 && estimatedComp == null)) {
+    competitorsVal = String(mappedComp);
+    competitorsSubtext = `${mappedComp} OSM Mapped`;
+    competitorsTitle = `${mappedComp} businesses mapped on OpenStreetMap / local geo-database`;
+  } else if (estimatedComp != null) {
+    competitorsVal = `~${estimatedComp}`;
+    competitorsSubtext = `Est. (${mappedComp} OSM Mapped)`;
+    competitorsTitle = `Estimated ~${estimatedComp} competitors (range ${compRange || estimatedComp}) based on demographic density (${mappedComp} mapped on OSM)`;
+  } else if (mappedComp === 0) {
+    competitorsVal = '0';
+    competitorsSubtext = 'OSM Mapped';
+    competitorsTitle = '0 businesses mapped on OpenStreetMap in this catchment';
+  } else {
+    competitorsVal = String(mappedComp);
+    competitorsSubtext = 'OSM Mapped';
+    competitorsTitle = `${mappedComp} businesses mapped on OpenStreetMap`;
+  }
+
   const marketsVal =
     localSummary?.nearbyMarkets != null
       ? String(localSummary.nearbyMarkets)
@@ -408,8 +436,10 @@ export function MarketTab({ report }: MarketTabProps): React.JSX.Element {
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-900">Competitors</p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">{competitorsVal}</p>
-              <span className="block text-[11px] text-slate-700 font-medium mt-0.5">OSM Mapped</span>
+              <p className="mt-1 text-xl font-extrabold text-slate-900" title={competitorsTitle}>{competitorsVal}</p>
+              <span className="block text-[11px] text-slate-700 font-medium mt-0.5" title={competitorsTitle}>
+                {competitorsSubtext}
+              </span>
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-900">Markets</p>
@@ -428,8 +458,8 @@ export function MarketTab({ report }: MarketTabProps): React.JSX.Element {
             <Info size={16} className="text-[#E8A93D] shrink-0 mt-0.5" />
             <p className="leading-relaxed text-slate-900">
               <strong className="font-bold text-slate-900">Historical &amp; Coverage Notice: </strong>
-              Demographics reflect the official Census 2011 baseline. Competitor density reflects observed
-              OpenStreetMap businesses; informal home-based ventures are not enumerated.
+              Demographics reflect the official Census 2011 baseline. Competitor count provides a defensible estimate
+              calibrated from household density (NSSO 73rd Round) and observed OpenStreetMap entries; informal home-based ventures are not enumerated.
             </p>
           </div>
         </div>

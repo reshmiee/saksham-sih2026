@@ -243,4 +243,33 @@ describe('MarketTab UI & Data Provenance Labeling', () => {
       expect(screen.getByText(/No category trend data recorded for Bera/i)).toBeInTheDocument();
     });
   });
+
+  it('displays estimated competitors correctly when 0 OSM businesses are mapped', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => MOCK_INSIGHTS,
+    } as unknown as Response);
+
+    const estimatedReport = {
+      ...MOCK_REPORT,
+      market: {
+        ...MOCK_REPORT.market,
+        localSummary: {
+          ...MOCK_REPORT.market.localSummary,
+          mappedCompetitors: 0,
+          estimatedCompetitors: 17,
+          competitorRange: '14–21',
+          competitorStatus: 'estimated' as const,
+        },
+      },
+    };
+
+    render(<MarketTab report={estimatedReport} />);
+
+    // Should display the estimated count (~17) and estimated badge
+    expect(screen.getByText('~17')).toBeInTheDocument();
+    expect(screen.getByText(/Est\. \(0 OSM Mapped\)/i)).toBeInTheDocument();
+  });
 });
+
