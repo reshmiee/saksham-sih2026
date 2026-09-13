@@ -399,6 +399,96 @@ Here is the breakdown of schemes:
     expect(screen.queryByText(/Error: We could not understand your question/i)).not.toBeInTheDocument();
     expect(screen.getByText(/saksham_core_architecture/i)).toBeInTheDocument();
   });
+
+  it('answers multi-intent query: Jait Mathura + 2 lakhs capital + schemes + business categories', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(
+      input,
+      'What is best categories to open a business in Jait Mathura with capital of 2 lakhs also list the schemes provided by the government related to it'
+    );
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/pre-feasibility and scheme analysis for starting a business in/i)
+      ).toBeInTheDocument();
+    });
+
+    // 1. Demographics grounded in Census 2011
+    expect(screen.getAllByText(/1,528 households/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/9,287/i).length).toBeGreaterThanOrEqual(1);
+
+    // 2. Capital leverage
+    expect(screen.getByText(/₹20 Lakh total project cost/i)).toBeInTheDocument();
+
+    // 3. Recommended categories
+    expect(screen.getByText(/Dairy Value-Addition & Milk Chilling Unit/i)).toBeInTheDocument();
+    expect(screen.getByText(/Modern Kirana \/ Daily Consumer Retail Store/i)).toBeInTheDocument();
+
+    // 4. Schemes
+    expect(screen.getAllByText(/PMFME Scheme/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/PMEGP Scheme/i)).toBeInTheDocument();
+    expect(screen.getByText(/PM Mudra Yojana/i)).toBeInTheDocument();
+
+    // 5. Verification of no boilerplate injection
+    expect(screen.queryByText(/Powered by SAKSHAM AI \(Gemini/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Input Not Recognized/i)).not.toBeInTheDocument();
+  });
+
+  it('answers competitor queries explaining the dual-layer OSM + demographic estimation model', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'Why does market summary show Competitors 0 OSM Mapped?');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/SAKSHAM Competitor Count & Catchment Estimation System/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Dual-Layer Estimation Methodology/i)).toBeInTheDocument();
+    expect(screen.getByText(/Statistical Density Estimator/i)).toBeInTheDocument();
+  });
+
+  it('answers scheme comparison query with structured comparison', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'Compare schemes PMFME vs PMEGP vs Mudra');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Comprehensive Comparison: PMFME vs PMEGP vs PM Mudra/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /PMFME Scheme/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /PMEGP Scheme/i })).toBeInTheDocument();
+  });
 });
 
 describe('parseAIMessageBlocks parser', () => {
@@ -441,6 +531,15 @@ Introductory text paragraph.
       { type: 'list', items: ['Step one', 'Step two'], isOrdered: true },
     ]);
   });
+
+  it('strips trailing dangling brackets from cut-off input in parser', () => {
+    const cutOffRaw = `### Incomplete Analysis\nHere is what we know about the market (` ;
+    const blocks = parseAIMessageBlocks(cutOffRaw);
+    expect(blocks.length).toBe(2);
+    expect(blocks[0]).toEqual({ type: 'heading', level: 3, text: 'Incomplete Analysis' });
+    expect(blocks[1]).toEqual({ type: 'paragraph', text: 'Here is what we know about the market' });
+  });
 });
+
 
 

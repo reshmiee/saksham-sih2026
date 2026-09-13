@@ -246,7 +246,11 @@ export type ContentBlock =
   | { type: 'paragraph'; text: string };
 
 export function parseAIMessageBlocks(rawText: string): ContentBlock[] {
-  const lines = rawText.split('\n');
+  // Sanitize text against dangling terminal punctuation
+  let cleanText = (rawText || '').trim();
+  cleanText = cleanText.replace(/[\(\[\{]\s*$/, '').trim();
+
+  const lines = cleanText.split('\n');
   const blocks: ContentBlock[] = [];
   let i = 0;
 
@@ -1086,19 +1090,31 @@ const STORAGE_KEY_AI_CHAT_HISTORY = 'saksham_ai_chat_history';
                     })}
 
                     {/* Key Points / Highlights */}
-                    {msg.key_points && msg.key_points.length > 0 && (
-                      <div className="mt-3.5 space-y-1.5 border-t border-slate-100 pt-3">
-                        <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">Key Points</h5>
-                        <ul className="space-y-1.5 pl-1">
-                          {msg.key_points.map((point, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-slate-800">
-                              <span className="text-emerald-600 font-bold shrink-0 mt-0.5">•</span>
-                              <span>{renderInlineMarkdown(point)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {(() => {
+                      const displayPoints = (msg.key_points || []).filter((point) => {
+                        const p = point.toLowerCase().trim();
+                        return (
+                          !p.startsWith('powered by') &&
+                          !p.includes('powered by saksham') &&
+                          !p.includes('सक्षम ai द्वारा संचालित')
+                        );
+                      });
+                      if (displayPoints.length === 0) return null;
+
+                      return (
+                        <div className="mt-3.5 space-y-1.5 border-t border-slate-100 pt-3">
+                          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">Key Points</h5>
+                          <ul className="space-y-1.5 pl-1">
+                            {displayPoints.map((point, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-slate-800">
+                                <span className="text-emerald-600 font-bold shrink-0 mt-0.5">•</span>
+                                <span>{renderInlineMarkdown(point)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
 
                     {/* Action Buttons for Assessment / Discover */}
                     {(msg.suggested_idea || msg.suggested_location) && (
