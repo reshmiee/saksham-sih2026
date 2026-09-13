@@ -58,7 +58,7 @@ export function IndiaMap({
   };
 
   return (
-    <div className={cn("relative flex h-full min-h-[480px] md:min-h-[540px] w-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs overflow-hidden map-shine-border", className)}>
+    <div className={cn("relative flex h-full min-h-[380px] sm:min-h-[460px] md:min-h-[540px] w-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-5 shadow-xs overflow-hidden map-shine-border", className)}>
       {/* ── TOP CONSOLIDATED HEADER & BREADCRUMB SURFACE ── */}
       <div className="relative z-20 flex flex-wrap items-center justify-between gap-2 pb-1">
         {/* Navigation Breadcrumb Trail */}
@@ -162,7 +162,7 @@ export function IndiaMap({
 
       {/* ── MAP CANVAS CONTAINER (ALL-INDIA NATIONAL HEATMAP) ── */}
       <div
-        className="relative flex flex-1 h-full min-h-[320px] w-full items-center justify-center my-2 rounded-xl overflow-hidden"
+        className="relative flex flex-1 h-full min-h-[260px] sm:min-h-[320px] w-full items-center justify-center my-2 rounded-xl overflow-hidden"
         role="region"
         aria-label="India & State Map"
       >

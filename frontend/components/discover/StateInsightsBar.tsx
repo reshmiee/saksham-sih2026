@@ -18,8 +18,7 @@ import {
   Sprout,
   BarChart3,
 } from 'lucide-react';
-import { cn } from '@/lib/cn';
-import { getStateOpportunityProfile } from '@/data/stateOpportunitiesData';
+import { getStateOpportunityProfile, getStateEconomicPulse } from '@/data/stateOpportunitiesData';
 import { getInsights, getSchemes } from '@/lib/api-client';
 import type { InsightsResponse, OfficialScheme } from '@/lib/api-types';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
@@ -31,6 +30,19 @@ interface StateInsightsBarProps {
   readonly selectedDistrict?: string | null;
   readonly browsingLocation: string;
   readonly availableCapital?: string;
+}
+
+function renderHighlightedStatement(text: string): React.ReactNode {
+  const parts = text.split(/(\d+(?:\.\d+)?%)/g);
+  return parts.map((part, i) =>
+    /^\d+(?:\.\d+)?%$/.test(part) ? (
+      <span key={i} className="font-bold text-slate-950">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
 }
 
 export function StateInsightsBar({
@@ -52,6 +64,7 @@ export function StateInsightsBar({
 
   const activeStateName = selectedState ?? 'Uttar Pradesh';
   const profile = getStateOpportunityProfile(activeStateName);
+  const pulse = profile.economicPulse ?? getStateEconomicPulse(activeStateName);
 
   // Check if active region is Uttar Pradesh (Active Pilot)
   const isUP =
@@ -173,7 +186,7 @@ export function StateInsightsBar({
           </div>
 
           {/* Illustration on right (State silhouette + Document + Upward bar chart) */}
-          <div className="relative w-28 h-14 shrink-0 flex items-center justify-end" aria-hidden="true">
+          <div className="hidden sm:flex relative w-24 sm:w-28 h-12 sm:h-14 shrink-0 items-center justify-end" aria-hidden="true">
             <svg viewBox="0 0 140 85" className="w-full h-full" fill="none">
               <path d="M40 20 C60 10, 110 15, 130 35 C140 55, 115 80, 85 75 C60 70, 30 75, 20 55 C10 35, 25 25, 40 20 Z" fill="#E6F5EC" opacity="0.6"/>
               <g transform="translate(45, 25)">
@@ -203,12 +216,15 @@ export function StateInsightsBar({
             <div className="w-7 h-7 rounded-full bg-emerald-100/80 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
               <Users size={14} strokeWidth={2.2} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-[12.5px] text-slate-800 leading-snug">
-                Jobs have grown steadily, with labor force participation at <span className="font-bold text-slate-950">41.2%</span>, up <span className="font-bold text-slate-950">2.8%</span> from last period.
+                {renderHighlightedStatement(
+                  pulse.laborForce.statement ??
+                    `Jobs have grown steadily, with labor force participation at ${pulse.laborForce.participationRate}%, up ${pulse.laborForce.growthRate}% from last period.`
+                )}
               </p>
               <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                Source: Periodic Labour Force Survey (PLFS 2022–23)
+                Source: {pulse.laborForce.source}
               </span>
             </div>
           </div>
@@ -218,12 +234,15 @@ export function StateInsightsBar({
             <div className="w-7 h-7 rounded-full bg-emerald-100/80 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
               <TrendingUp size={14} strokeWidth={2.2} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-[12.5px] text-slate-800 leading-snug">
-                The state economy is expanding, with GSDP growth of <span className="font-bold text-slate-950">7.6%</span> year-over-year.
+                {renderHighlightedStatement(
+                  pulse.gsdp.statement ??
+                    `The state economy is expanding, with GSDP growth of ${pulse.gsdp.growthRate}% year-over-year.`
+                )}
               </p>
               <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                Source: State GSDP Estimates (2023–24)
+                Source: {pulse.gsdp.source}
               </span>
             </div>
           </div>
@@ -233,12 +252,15 @@ export function StateInsightsBar({
             <div className="w-7 h-7 rounded-full bg-emerald-100/80 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
               <Briefcase size={14} strokeWidth={2.2} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-[12.5px] text-slate-800 leading-snug">
-                More people are starting businesses — new MSME registrations are up <span className="font-bold text-slate-950">28%</span> from last year.
+                {renderHighlightedStatement(
+                  pulse.msme.statement ??
+                    `More people are starting businesses — new MSME registrations are up ${pulse.msme.growthRate}% from last year.`
+                )}
               </p>
               <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                Source: Udyam Registration Data (2023–24)
+                Source: {pulse.msme.source}
               </span>
             </div>
           </div>
@@ -248,12 +270,12 @@ export function StateInsightsBar({
             <div className="w-7 h-7 rounded-full bg-emerald-100/80 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
               <Sprout size={14} strokeWidth={2.2} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-[12.5px] text-slate-800 leading-snug">
-                The state is actively backing dairy, ODOP clusters, and PMFME-supported food processing.
+                {pulse.prioritySectors.statement}
               </p>
               <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                Source: State Scheme Documents (ODOP, PMFME, State Budget)
+                Source: {pulse.prioritySectors.source}
               </span>
             </div>
           </div>
@@ -297,14 +319,14 @@ export function StateInsightsBar({
 
           {/* Sector Pills with Shining Effect */}
           <div className="flex flex-wrap gap-2 pt-2.5">
-            {[
+            {(profile.prioritySectorsPills ?? pulse.prioritySectorsPills ?? [
               'Dairy & Allied',
               'Food Processing',
               'Agri-Business',
               'ODOP (One District One Product)',
               'Handicrafts & Textiles',
               'Rural Services',
-            ].map((sector) => (
+            ]).map((sector) => (
               <button
                 key={sector}
                 type="button"

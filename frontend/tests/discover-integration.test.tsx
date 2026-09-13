@@ -240,6 +240,27 @@ describe('Discover Live Backend Integration (Task 7)', () => {
       });
       expect(screen.getByText('Dairy & Allied')).toBeInTheDocument();
     });
+
+    it('dynamically displays real PLFS, GSDP, Udyam MSME, and sector pills for Chhattisgarh', () => {
+      render(
+        <StateInsightsBar
+          selectedState="Chhattisgarh"
+          browsingLocation="Chhattisgarh"
+        />
+      );
+
+      expect(screen.getByText('State Economic Pulse')).toBeInTheDocument();
+      // Chhattisgarh PLFS participation rate 55.4%
+      expect(screen.getByText(/55\.4%/)).toBeInTheDocument();
+      // Chhattisgarh MSME growth 24%
+      expect(screen.getByText(/24%/)).toBeInTheDocument();
+      // Chhattisgarh specific priority sectors statement
+      expect(screen.getByText(/minor forest produce, Kodo-Kutki millets/i)).toBeInTheDocument();
+      // Priority pills
+      expect(screen.getByRole('button', { name: 'Kodo-Kutki Millets' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Bastar Bell Metal Craft' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'ODOP Kosa Silk' })).toBeInTheDocument();
+    });
   });
 
   describe('ArticleCategorySection Live Backend Integration', () => {

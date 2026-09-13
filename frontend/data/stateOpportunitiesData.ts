@@ -7,6 +7,14 @@ import {
   getStateRealData,
   STATE_REAL_DATA,
 } from './stateCensusODOPData';
+import {
+  type StateEconomicPulse,
+  getStateEconomicPulse,
+  STATE_ECONOMIC_PULSE_DATA,
+} from './stateEconomicPulseData';
+
+export type { StateEconomicPulse };
+export { getStateEconomicPulse, STATE_ECONOMIC_PULSE_DATA };
 
 export type OpportunityLevel = 'High' | 'Medium' | 'Emerging' | 'Lower';
 
@@ -32,6 +40,8 @@ export interface StateOpportunityProfile {
   readonly nearbyHubsCount: number;
   readonly census?: Census2011Metrics;
   readonly odop?: ODOPMetrics;
+  readonly economicPulse?: StateEconomicPulse;
+  readonly prioritySectorsPills?: readonly string[];
   readonly featuredArticle: {
     readonly badge: string;
     readonly title: string;
@@ -609,6 +619,7 @@ export const STATE_OPPORTUNITY_PROFILES: Record<string, StateOpportunityProfile>
 export function getStateOpportunityProfile(stateNameOrId: string | null): StateOpportunityProfile {
   const clean = stateNameOrId ? stateNameOrId.trim().toLowerCase() : 'up';
   const realData = getStateRealData(clean);
+  const pulse = getStateEconomicPulse(clean);
 
   // Look up by ID directly
   let profile: StateOpportunityProfile | null = null;
@@ -630,6 +641,8 @@ export function getStateOpportunityProfile(stateNameOrId: string | null): StateO
       ...profile,
       census: profile.census ?? realData.census_2011,
       odop: profile.odop ?? realData.odop,
+      economicPulse: profile.economicPulse ?? pulse,
+      prioritySectorsPills: profile.prioritySectorsPills ?? pulse.prioritySectorsPills,
     };
   }
 
@@ -658,6 +671,8 @@ export function getStateOpportunityProfile(stateNameOrId: string | null): StateO
     nearbyHubsCount: 4,
     census: realData.census_2011,
     odop: realData.odop,
+    economicPulse: pulse,
+    prioritySectorsPills: pulse.prioritySectorsPills,
     featuredArticle: {
       badge: `Rising in ${displayName}`,
       title: `Micro-enterprise registrations growing in ${displayName}`,
