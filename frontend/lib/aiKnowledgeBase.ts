@@ -177,20 +177,22 @@ export async function querySakshamAI(
     if (geminiRes.ok) {
       const geminiData = await geminiRes.json();
       if (geminiData && geminiData.available && geminiData.answer) {
+        const modelName = geminiData.model || 'Gemini 3.6 Flash';
+        const modelLabel = modelName.replace(/^gemini-/, 'Gemini ').replace(/-/g, ' ');
         return {
           answer: geminiData.answer,
           key_points: [
             language === 'hi'
-              ? 'सक्षम AI जेमिनी 1.5 फ़्लैश द्वारा संचालित'
-              : 'Powered by SAKSHAM AI Gemini 1.5 Flash',
+              ? `सक्षम AI (${modelLabel}) द्वारा संचालित`
+              : `Powered by SAKSHAM AI (${modelLabel})`,
             language === 'hi'
               ? '10% उद्यमी मार्जिन + 90% प्राथमिकता बैंक ऋण संरचना'
               : 'Financing Structure: 10% borrower equity margin + 90% loan',
           ],
           citations: [
             {
-              document_id: 'gemini_flash_grounded',
-              source: 'Google Gemini 1.5 Flash (SAKSHAM Grounded Engine)',
+              document_id: 'gemini_grounded',
+              source: `Google ${modelLabel} (SAKSHAM Grounded Engine)`,
             },
           ],
           grounding_status: 'fully_grounded',
@@ -246,31 +248,196 @@ export async function querySakshamAI(
   return generateDeepProjectAnswer(clean, language);
 }
 
+// ─── Semantic Intent Taxonomy & Classifier ─────────────────────────────────
+
+export type SemanticQueryIntent =
+  | 'PROJECT_OVERVIEW'
+  | 'FINANCING_AND_MARGIN'
+  | 'SUBSIDY_AND_SCHEMES'
+  | 'BUSINESS_PREFEASIBILITY'
+  | 'LOCATION_AND_DEMOGRAPHICS'
+  | 'GREETING_AND_HELP'
+  | 'UNRELATED';
+
+export function classifyQueryIntent(rawQuery: string): SemanticQueryIntent {
+  const clean = rawQuery.trim().toLowerCase();
+
+  // 1. Project Overview & Architecture
+  const isProjectOverview =
+    /\b(summarize|summarise|summary|overview|about\s+saksham|explain\s+(this\s+)?(project|system|saksham)|project\s+summary|project\s+overview|what\s+is\s+saksham|what\s+does\s+(this\s+)?(project|system|saksham)\s+do|how\s+does\s+(this\s+)?(project|system|saksham)\s+work|architecture|tech\s+stack|technologies|recommendation\s+system|ai\s+architecture|sih|problem\s+does\s+saksham\s+solve|purpose\s+of\s+(this\s+)?(project|application)|what\s+does\s+this\s+do|tell\s+me\s+about\s+saksham|tell\s+me\s+about\s+the\s+project)\b/i.test(clean) ||
+    /^(summarize|summarise|summary|overview|about\s+project|project\s+details|system\s+overview|system\s+details|saksham|what\s+is\s+this)$/i.test(clean) ||
+    /(सक्षम\s+क्या\s+है|प्रोजेक्ट\s+(का\s+)?सारांश|योजना\s+का\s+उद्देश्य|सक्षम\s+के\s+बारे\s+में|प्रोजेक्ट\s+के\s+बारे\s+में|सक्षम\s+प्रोजेक्ट)/i.test(clean);
+
+  if (isProjectOverview) {
+    return 'PROJECT_OVERVIEW';
+  }
+
+  // 2. Greetings & Help
+  const isGreeting =
+    /^(hello|hi|hey|help|who\s+are\s+you|what\s+can\s+you\s+do|namaste|नमस्ते|नमस्कार|வணக்கம்|నమస్కారం)\b/i.test(clean) ||
+    clean === 'who are you' ||
+    clean === 'what can you do';
+
+  if (isGreeting) {
+    return 'GREETING_AND_HELP';
+  }
+
+  // 3. Subsidies & Government Schemes
+  const isSubsidy =
+    /\b(pmfme|pmegp|mudra|vishwakarma|subsidy|subsidies|grant|grants|scheme|schemes|सब्सिडी|अनुदान|योजना|सरकारी\s+सहायता|மானியம்|రాయితీ)\b/i.test(clean) ||
+    /what\s+(government\s+)?(subsid|scheme)/i.test(clean);
+
+  if (isSubsidy) {
+    return 'SUBSIDY_AND_SCHEMES';
+  }
+
+  // 4. Financing, Margin, Loan & Investment
+  const isFinancing =
+    /\b(margin|10%|90%|equity|debt|borrower\s+contribution|contribution|own\s+money|own\s+capital|invest|investment|invested|down\s+payment|own\s+pocket|loan|bank\s+loan|emi|interest\s+rate|finance|financing|मार्जिन|पूँजी|पूंजी|निवेश|ऋण|लोन|कर्ज|రుణం|கடன்)\b/i.test(clean) ||
+    /how\s+much\s+(do\s+i\s+need|money|should\s+i\s+put|to\s+invest)/i.test(clean);
+
+  if (isFinancing) {
+    return 'FINANCING_AND_MARGIN';
+  }
+
+  // 5. Specific Pre-feasibility (Dairy, Milk, Food processing, Shops)
+  const isBusiness =
+    /\b(dairy|yogurt|milk|curd|paneer|dahi|chilling|डेयरी|दूध|दही|पनीर|दुग्ध|பால்|పాడి)\b/i.test(clean) ||
+    /\b(kirana|grocery|retail|dukaan|shop|store|flour\s+mill|atta\s+chakki|bakery|food\s+processing|textile|garment|cloth|tailor|manufacturing|startup|enterprise|business\s+idea|profitable\s+business|good\s+business|what\s+business\s+can\s+i\s+start|दुकान|किराना|व्यापार|व्यवसाय|கடை|దుకాణం)\b/i.test(clean) ||
+    /start\s+(a\s+)?(business|shop|unit|store)/i.test(clean);
+
+  if (isBusiness) {
+    return 'BUSINESS_PREFEASIBILITY';
+  }
+
+  // 6. Location & Demographics
+  const isLocation =
+    /\b(mathura|chhata|kamar|barsana|shergarh|nandgaon|मथुरा|छाता|कामर|बरसाना)\b/i.test(clean) ||
+    /\b(census|odop|population|demographic|district|state|जनसंख्या|आबादी|जिले|राज्य)\b/i.test(clean) ||
+    Boolean(findStateByQuery(rawQuery));
+
+  if (isLocation) {
+    return 'LOCATION_AND_DEMOGRAPHICS';
+  }
+
+  // 7. General business keywords that imply rural enterprise advisory
+  if (
+    /\b(village|gaon|rural|gram|shopkeeper|farmer|mandi|fssai|udyam|license|working\s+capital|profit|earning|गाँव|गांव|कस्बा)\b/i.test(clean)
+  ) {
+    return 'BUSINESS_PREFEASIBILITY';
+  }
+
+  // 8. Otherwise: unrelated query
+  return 'UNRELATED';
+}
+
 // ─── Deep Project Knowledge Base Reasoning Engine ───────────────────────────
 
 function generateDeepProjectAnswer(query: string, language: string = 'en'): AIAdvisoryResult {
   const q = query.toLowerCase();
+  const intent = classifyQueryIntent(query);
+
+  // Scenario 0: SAKSHAM Project Overview, Purpose, and Architecture
+  if (intent === 'PROJECT_OVERVIEW') {
+    if (language === 'hi') {
+      return {
+        answer:
+          '**सक्षम (SAKSHAM - Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises)** स्मार्ट इंडिया हैकाथॉन #91 के लिए विकसित एक AI-संचालित ग्रामीण उद्यम व्यवहार्यता और पूर्व-व्यवहार्यता (Pre-feasibility) प्लेटफ़ॉर्म है।\n\n### मुख्य सिस्टम वास्तुकला और उद्देश्य:\n• **समस्या का समाधान**: ग्रामीण उद्यमी औपचारिक वित्तीय डेटा और बाजार मांग की जानकारी न होने के कारण अनौपचारिक कर्ज के जाल में फंस जाते हैं। सक्षम डेटा-आधारित व्यवहार्यता और वित्तीय मार्गदर्शन प्रदान करता है।\n• **4-कारक व्यवहार्यता मॉडल**: बाजार मांग (30%), स्थानीय प्रतिस्पर्धा (25%), पूँजी उपलब्धता (25%), और बुनियादी ढाँचा (20%) के आधार पर 0 से 100 का सटीक फ़िट स्कोर प्रदान करता है।\n• **10/90 वित्तपोषण संरचना**: केवल 10% उद्यमी बचत (मार्जिन) और 90% प्राथमिकता बैंक ऋण (₹10 लाख तक) पर आधारित।\n• **सरकारी योजनाएं**: PMFME (35% पूंजीगत सब्सिडी ₹10 लाख तक), PMEGP (15% से 35% अनुदान), और मुद्रा योजना का सीधा लाभ।\n• **सत्यापित डेटा स्रोत**: आधिकारिक जनगणना 2011, एक जिला एक उत्पाद (ODOP), और उद्यम पंजीकरण डेटा पर आधारित।\n• **तकनीकी स्टैक**: Next.js 16 (React 19, TypeScript, Tailwind CSS), FastAPI (Python 3.12, asyncpg, SQLAlchemy), PostgreSQL (Neon), और Google Gemini AI।',
+        key_points: [
+          'सक्षम SIH #91 के तहत ग्रामीण उद्यमों को सफल बनाने के लिए विकसित किया गया है।',
+          'वित्तपोषण संरचना: 10% उद्यमी मार्जिन + 90% प्राथमिकता बैंक ऋण (₹10 लाख तक)।',
+          '4-कारक व्यवहार्यता मॉडल: मांग (30%), प्रतिस्पर्धा (25%), पूँजी (25%), बुनियादी ढाँचा (20%)।',
+          'सरकारी योजनाएं: PMFME (35% सब्सिडी), PMEGP, और मुद्रा ऋण का पूर्ण एकीकरण।',
+        ],
+        citations: [
+          {
+            document_id: 'saksham_core_architecture',
+            source: 'SAKSHAM System Specifications (SIH #91)',
+            page_start: 1,
+            page_end: 6,
+            excerpt: 'Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises.',
+          },
+        ],
+        grounding_status: 'fully_grounded',
+        is_valid: true,
+      };
+    }
+
+    if (language === 'mr') {
+      return {
+        answer:
+          '**सक्षम (SAKSHAM)** हे ग्रामीण सूक्ष्म उद्योगांसाठी स्मार्ट इंडिया हॅकाथॉन #91 अंतर्गत विकसित केलेले AI-आधारित पूर्व-व्यवहार्यता आणि वित्त सहाय्य व्यासपीठ आहे.\n\n### प्रमुख वैशिष्ट्ये आणि रचना:\n• **4-घटक व्यवहार्यता मॉडेल**: स्थानिक मागणी (30%), स्पर्धा (25%), भांडवल (25%), आणि पायाभूत सुविधा (20%) यावर आधारित 0 ते 100 अचूक स्कोअर देते.\n• **10% स्वतःचे भांडवल + 90% बँक कर्ज**: उद्योजकाला केवळ 10% रक्कम गुंतवावी लागते, उर्वरित 90% बँक कमी व्याजदराने कर्ज देते.\n• **शासकीय योजना**: PMFME (35% भांडवली अनुदान), PMEGP, आणि मुद्रा कर्ज योजनांचे थेट मार्गदर्शन.',
+        key_points: [
+          'सक्षम SIH #91 अंतर्गत ग्रामीण उद्योजकांसाठी विकसित केले गेले आहे.',
+          'रचना: 10% स्वतःचे भांडवल + 90% बँक कर्ज (₹10 लाखांपर्यंत).',
+          'शासकीय योजना: PMFME (35% अनुदान), PMEGP आणि मुद्रा कर्ज.',
+        ],
+        citations: [
+          {
+            document_id: 'saksham_core_architecture',
+            source: 'SAKSHAM System Specifications (SIH #91)',
+          },
+        ],
+        grounding_status: 'fully_grounded',
+        is_valid: true,
+      };
+    }
+
+    // Default English
+    return {
+      answer:
+        '**SAKSHAM (Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises)** is an AI-driven enterprise viability, pre-feasibility, and priority credit assessment platform developed for Smart India Hackathon #91.\n\n### Core System Architecture & Purpose:\n• **Problem Solved**: Rural micro-entrepreneurs face high business mortality and predatory credit due to lack of local market viability data and formal financial profiles. SAKSHAM provides instant data-driven feasibility assessments and credit readiness.\n• **4-Factor Viability Model**: Calculates a calibrated 0–100 Fit Score based on Market Demand (30%), Catchment Competition (25%), Capital Feasibility (25%), and Infrastructure (20%).\n• **Statutory Financing Structure**: Built on a 10% borrower equity margin and a 90% priority institutional bank loan (up to ₹10 Lakhs) with low rural interest rates (7.5%–8.5%).\n• **Government Scheme Navigation**: Seamlessly integrates central and state concessional credit schemes including PMFME (35% capital subsidy up to ₹10L), PMEGP (15%–35% subsidy), and PM Mudra collateral-free loans.\n• **Grounded Data Sources**: Grounded in official Census 2011 demographics, One District One Product (ODOP) catalogs, Ministry of MSME Udyam trends, and pre-feasibility project reports.\n• **Technology Stack**: Built with Next.js 16 (React 19, TypeScript, Tailwind CSS), FastAPI (Python 3.12, asyncpg, SQLAlchemy), PostgreSQL (Neon), and Google Gemini Generative AI.',
+      key_points: [
+        'SAKSHAM was developed for Smart India Hackathon #91 to eliminate rural micro-enterprise failure.',
+        'Financing Model: Statutory 10% borrower equity margin + 90% priority bank loan up to ₹10 Lakhs.',
+        '4-Factor Feasibility Model: Market Demand (30%), Local Competition (25%), Capital Fit (25%), Infrastructure (20%).',
+        'Grounded Scheme Integration: PMFME (35% capital subsidy), PMEGP (15-35% subsidy), and PM Mudra.',
+        'Verified Data Grounding: Official Census 2011, ODOP catalogs, and MSME Udyam registration trends.',
+      ],
+      citations: [
+        {
+          document_id: 'saksham_core_architecture',
+          source: 'SAKSHAM System Specifications (SIH #91)',
+          page_start: 1,
+          page_end: 6,
+          excerpt: 'Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises. 4-factor feasibility model, 10% margin / 90% debt structure, and grounded scheme integration.',
+        },
+      ],
+      grounding_status: 'fully_grounded',
+      is_valid: true,
+    };
+  }
 
   // Scenario A: 10% Margin / Financial Structure / SAKSHAM Architecture
   if (
-    q.includes('margin') ||
-    q.includes('10%') ||
-    q.includes('90%') ||
-    q.includes('sih') ||
-    q.includes('fit score') ||
-    q.includes('architecture') ||
-    q.includes('how saksham works') ||
-    q.includes('formula') ||
-    q.includes('equity') ||
-    q.includes('debt') ||
-    q.includes('finance') ||
-    q.includes('loan') ||
-    q.includes('मार्जिन') ||
-    q.includes('ऋण') ||
-    q.includes('लोन') ||
-    q.includes('कर्ज') ||
-    q.includes('कடன்') ||
-    q.includes('రుణం')
+    (intent === 'FINANCING_AND_MARGIN' ||
+      q.includes('margin') ||
+      q.includes('10%') ||
+      q.includes('90%') ||
+      q.includes('contribution') ||
+      q.includes('invest') ||
+      q.includes('own money') ||
+      q.includes('own capital') ||
+      q.includes('pocket') ||
+      q.includes('down payment') ||
+      q.includes('sih') ||
+      q.includes('fit score') ||
+      q.includes('architecture') ||
+      q.includes('how saksham works') ||
+      q.includes('formula') ||
+      q.includes('equity') ||
+      q.includes('debt') ||
+      q.includes('finance') ||
+      q.includes('loan') ||
+      q.includes('मार्जिन') ||
+      q.includes('ऋण') ||
+      q.includes('लोन') ||
+      q.includes('कर्ज') ||
+      q.includes('कடன்') ||
+      q.includes('రుణం')) &&
+    !q.includes('pmfme') &&
+    !q.includes('subsidy') &&
+    !q.includes('सब्सिडी')
   ) {
     if (language === 'hi') {
       return {
@@ -548,6 +715,7 @@ function generateDeepProjectAnswer(query: string, language: string = 'en'): AIAd
 
   // Scenario C: PMFME Scheme Guidelines & Subsidies
   if (
+    intent === 'SUBSIDY_AND_SCHEMES' ||
     q.includes('pmfme') ||
     q.includes('subsidy') ||
     q.includes('subsidies') ||
@@ -758,6 +926,7 @@ function generateDeepProjectAnswer(query: string, language: string = 'en'): AIAd
 
   // Scenario E: Agribusiness & General Rural Enterprise Planning (MANAGE Handbook)
   if (
+    intent === 'BUSINESS_PREFEASIBILITY' ||
     q.includes('license') ||
     q.includes('fssai') ||
     q.includes('udyam') ||
@@ -851,6 +1020,7 @@ function generateDeepProjectAnswer(query: string, language: string = 'en'): AIAd
   // Scenario F: State / Census 2011 / ODOP Specific Lookup
   const matchedState = findStateByQuery(query);
   const isDemographicsQuery =
+    intent === 'LOCATION_AND_DEMOGRAPHICS' ||
     q.includes('census') ||
     q.includes('odop') ||
     q.includes('population') ||
@@ -915,6 +1085,7 @@ function generateDeepProjectAnswer(query: string, language: string = 'en'): AIAd
 
   // Scenario G: Conversational Greetings & Overview
   if (
+    intent === 'GREETING_AND_HELP' ||
     q === 'hello' ||
     q === 'hi' ||
     q === 'hey' ||
@@ -969,31 +1140,72 @@ function generateDeepProjectAnswer(query: string, language: string = 'en'): AIAd
     };
   }
 
-  // Scenario H: Unrecognized / Invalid input fallback - DO NOT fabricate census data!
+  // Scenario H: General Domain Boundary & Guidance Fallback
+  // Valid natural-language queries that fall outside indexed topics receive structured domain guidance
+  // without triggering "Input Not Recognized".
   if (language === 'hi') {
     return {
       answer:
-        `⚠️ त्रुटि: हमें आपका प्रश्न "${query.trim()}" समझ नहीं आया।\n\nकृपया सरल शब्दों में अपना प्रश्न पूछें, जैसे:\n• "डेयरी या किराना दुकान शुरू करने में कितना खर्च आता है?"\n• "10% अपनी पूँजी और 90% बैंक ऋण कैसे काम करता है?"\n• "PMFME या मुद्रा लोन की सरकारी सब्सिडी कैसे मिलती है?"\n• "गाँव में कौन सा व्यवसाय सबसे अच्छा रहेगा?"`,
+        'मैं **सक्षम AI (SAKSHAM AI)** हूँ — स्मार्ट इंडिया हैकाथॉन #91 के तहत ग्रामीण सूक्ष्म-उद्यमियों के लिए विकसित निर्णय सहायता और क्रेडिट तत्परता प्लेटफ़ॉर्म।\n\nयद्यपि मैं ग्रामीण व्यवसाय पूर्व-व्यवहार्यता, ऋण संरचना (10% बचत + 90% बैंक ऋण), और सरकारी योजनाओं (PMFME, PMEGP, मुद्रा) में विशेषज्ञता रखता हूँ, आप मुझसे इन मुख्य विषयों पर पूछ सकते हैं:\n• **व्यवसाय पूर्व-व्यवहार्यता**: डेयरी/दही इकाई, किराना दुकान, आटा चक्की और खाद्य प्रसंस्करण की स्थापना लागत और मुनाफा।\n• **10/90 वित्तपोषण**: केवल 10% उद्यमी पूँजी और 90% प्राथमिकता बैंक ऋण संरचना (₹10 लाख तक)।\n• **सरकारी अनुदान**: PMFME (35% पूंजीगत सब्सिडी ₹10 लाख तक), PMEGP, और मुद्रा ऋण।\n• **जनगणना 2011 व ODOP**: राज्य और जिले की जनसंख्या और शीर्ष उत्पाद।\n\nकृपया ग्रामीण व्यवसाय शुरू करने, वित्तीय दिशानिर्देशों या अपने क्षेत्र के लिए व्यावसायिक विचार के बारे में पूछें।',
       key_points: [
-        'कृपया छोटे व्यवसायों, ऋणों या सब्सिडी के बारे में सरल हिंदी में पूछें।',
-        'वर्तनी की जाँच करें और यादृच्छिक अक्षरों से बचें।',
+        'सक्षम AI ग्रामीण सूक्ष्म उद्यम व्यवहार्यता और ऋण तत्परता में विशेषज्ञ है।',
+        '10% उद्यमी मार्जिन + 90% प्राथमिकता बैंक ऋण संरचना (₹10 लाख तक)।',
+        'सरकारी योजनाएं: PMFME (35% सब्सिडी), PMEGP, और मुद्रा ऋण का एकीकरण।',
       ],
-      citations: [],
-      grounding_status: 'invalid_input',
-      is_valid: false,
+      citations: [
+        {
+          document_id: 'saksham_core_architecture',
+          source: 'SAKSHAM System Specifications (SIH #91)',
+          page_start: 1,
+          page_end: 6,
+          excerpt: 'Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises.',
+        },
+      ],
+      grounding_status: 'domain_knowledge',
+      is_valid: true,
     };
   }
 
+  if (language === 'mr') {
+    return {
+      answer:
+        'मी **सक्षम AI (SAKSHAM AI)** आहे — ग्रामीण सूक्ष्म उद्योजकांसाठी स्मार्ट इंडिया हॅकाथॉन #91 अंतर्गत विकसित केलेले AI सहाय्यक.\n\nमी प्रामुख्याने ग्रामीण व्यवसाय पूर्व-व्यवहार्यता, 10% स्वतःचे भांडवल + 90% बँक कर्ज आणि शासकीय योजनांवर (PMFME, PMEGP, मुद्रा) मार्गदर्शन करतो. आपण खालील विषयांवर विचारू शकता:\n• **व्यवसाय संधी**: दुग्ध व्यवसाय, किराणा दुकान, पीठ गिरणी आणि अन्न प्रक्रिया प्रकल्प.\n• **10/90 वित्तपुरवठा**: 10% स्वतःचे भांडवल + 90% बँक कर्ज संरचना (₹10 लाखांपर्यंत).\n• **शासकीय योजना**: PMFME (35% अनुदान), PMEGP आणि मुद्रा कर्ज.',
+      key_points: [
+        'सक्षम AI ग्रामीण उद्योग व्यवहार्यता आणि बँक कर्जासाठी मार्गदर्शन करते.',
+        '10% भांडवल + 90% बँक कर्ज योजना.',
+        'PMFME 35% अनुदान आणि मुद्रा कर्ज एकत्रीकरण.',
+      ],
+      citations: [
+        {
+          document_id: 'saksham_core_architecture',
+          source: 'SAKSHAM System Specifications (SIH #91)',
+        },
+      ],
+      grounding_status: 'domain_knowledge',
+      is_valid: true,
+    };
+  }
+
+  // Default English domain guidance
   return {
     answer:
-      `⚠️ Error: We could not understand your question "${query.trim()}".\n\nPlease ask your question using simple English words, like:\n• "How much does it cost to start a dairy or grocery shop?"\n• "How does the 10% own money and 90% bank loan work?"\n• "What government subsidies can I get (PMFME, PMEGP, Mudra)?"\n• "What is a good business idea for my village?"`,
+      'I am **SAKSHAM AI** — an AI-powered enterprise viability and priority credit readiness advisor developed for Indian micro-entrepreneurs under Smart India Hackathon #91.\n\nWhile I specialize in rural business feasibility, priority financing (10% borrower equity / 90% bank loan), and government schemes, here is how I can assist you:\n• **Pre-Feasibility Reports**: Setup costs, machinery, and profit margins for Dairy/Yogurt plants, Kirana/retail shops, flour mills, and agro-processing.\n• **Statutory Financing**: The 10% borrower equity / 90% priority bank loan structure (up to ₹10 Lakhs) and 4-factor feasibility scoring.\n• **Government Subsidies**: 35% credit-linked capital subsidy under PMFME (up to ₹10 Lakhs), PMEGP (15–35% subsidy), and PM Mudra collateral-free loans.\n• **Demographics & Clusters**: Census 2011 population data, One District One Product (ODOP) catalogs, and district enterprise profiles.\n\nFeel free to ask a question about starting an enterprise, evaluating business viability, or financing guidelines!',
     key_points: [
-      'Please ask about small businesses, loans, or subsidies in simple English.',
-      'Check your spelling and avoid random letters or symbols.',
+      'SAKSHAM AI specializes in rural micro-enterprise viability and priority credit readiness.',
+      'Financing Model: 10% borrower equity margin + 90% priority bank loan up to ₹10 Lakhs.',
+      'Scheme Integration: PMFME (35% capital subsidy up to ₹10L), PMEGP, and PM Mudra loans.',
     ],
-    citations: [],
-    grounding_status: 'invalid_input',
-    is_valid: false,
+    citations: [
+      {
+        document_id: 'saksham_core_architecture',
+        source: 'SAKSHAM System Specifications (SIH #91)',
+        page_start: 1,
+        page_end: 6,
+        excerpt: 'Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises.',
+      },
+    ],
+    grounding_status: 'domain_knowledge',
+    is_valid: true,
   };
 }
 

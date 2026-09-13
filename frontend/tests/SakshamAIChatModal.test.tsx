@@ -19,6 +19,9 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn();
 describe('SakshamAIChatModal Component', () => {
   beforeEach(() => {
     localStorage.clear();
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = 'en';
+    }
     mockPush.mockClear();
     vi.clearAllMocks();
     vi.stubGlobal(
@@ -283,6 +286,118 @@ Here is the breakdown of schemes:
     expect(screen.getByRole('columnheader', { name: /PMEGP/i })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: /₹10 Lakhs/i })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: /₹50 Lakhs/i })).toBeInTheDocument();
+  });
+
+  it('handles "summarize the project" with grounded overview and does NOT flag as input not recognized', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'summarize the project');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Input Not Recognized/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Error: We could not understand your question/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Smart India Hackathon #91/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/4-Factor Viability Model/i)).toBeInTheDocument();
+    expect(screen.getByText(/saksham_core_architecture/i)).toBeInTheDocument();
+  });
+
+  it('answers "what is SAKSHAM?" with system overview', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'what is SAKSHAM?');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Smart Advisory & Knowledge System for Holistic Assessment of Micro-enterprises/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Input Not Recognized/i)).not.toBeInTheDocument();
+  });
+
+  it('answers "Explain PMFME scheme guidelines, 35% capital subsidy, and borrower margin"', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'Explain PMFME scheme guidelines, 35% capital subsidy, and borrower margin');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/35% cash subsidy/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Input Not Recognized/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/pmfme_scheme_guidelines/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('answers "how much money do I need to invest?" with 10% borrower margin', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'how much money do I need to invest?');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/statutory priority financing guidelines/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/10% borrower equity margin/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Input Not Recognized/i)).not.toBeInTheDocument();
+  });
+
+  it('provides domain guidance without "Input Not Recognized" for clean queries outside direct topics', async () => {
+    const user = userEvent.setup();
+    render(
+      <ShellProvider>
+        <SakshamAIChatModal isOpen={true} onClose={vi.fn()} />
+      </ShellProvider>
+    );
+
+    const input = screen.getByRole('textbox', { name: /Ask SAKSHAM AI a question/i });
+    await user.type(input, 'who won the cricket world cup?');
+    const sendBtn = screen.getByRole('button', { name: /Send query/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/priority credit readiness advisor/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Input Not Recognized/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Error: We could not understand your question/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/saksham_core_architecture/i)).toBeInTheDocument();
   });
 });
 
